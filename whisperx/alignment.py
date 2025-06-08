@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torchaudio
+from tqdm import tqdm
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 from whisperx.audio import SAMPLE_RATE, load_audio
@@ -142,13 +143,9 @@ def align(
     total_segments = len(transcript)
     # Store temporary processing values
     segment_data: dict[int, SegmentData] = {}
-    for sdx, segment in enumerate(transcript):
+    for sdx, segment in tqdm(enumerate(transcript), total=total_segments, desc="Preprocessing Segments",
+                             disable=not print_progress):
         # strip spaces at beginning / end, but keep track of the amount.
-        if print_progress:
-            base_progress = ((sdx + 1) / total_segments) * 100
-            percent_complete = (50 + base_progress / 2) if combined_progress else base_progress
-            print(f"Progress: {percent_complete:.2f}%...")
-            
         num_leading = len(segment["text"]) - len(segment["text"].lstrip())
         num_trailing = len(segment["text"]) - len(segment["text"].rstrip())
         text = segment["text"]

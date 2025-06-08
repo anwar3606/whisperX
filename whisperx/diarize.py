@@ -1,24 +1,63 @@
 import numpy as np
 import pandas as pd
 from pyannote.audio import Pipeline
-from typing import Optional, Union
+from typing import Optional, Union, Text, Any, Mapping
 import torch
+from tqdm import tqdm
 
 from whisperx.audio import load_audio, SAMPLE_RATE
 from whisperx.types import TranscriptionResult, AlignedTranscriptionResult
 
 
+class TQDMHook:
+    def __init__(self, base_position=-1):
+        self.progress_bars = {}
+        self.position_counter = base_position
+
+    def __call__(
+            self,
+            step_name: Text,
+            step_artifact: Any,
+            file: Optional[Mapping] = None,
+            total: Optional[int] = None,
+            completed: Optional[int] = None,
+    ):
+        if total is None:
+            return
+
+            # Create a new progress bar if this step_name hasn't been seen before
+        if step_name not in self.progress_bars:
+            self.position_counter += 1
+            self.progress_bars[step_name] = tqdm(
+                desc=step_name,
+                total=total,
+                position=self.position_counter,
+                leave=True
+            )
+
+        progress = self.progress_bars[step_name]
+        if completed is not None:
+            if progress.total > completed:
+                progress.update(completed - progress.n)
+            else:
+                progress.update(progress.total - progress.n)
+        progress.refresh()
+
+
 class DiarizationPipeline:
     def __init__(
-        self,
-        model_name=None,
-        use_auth_token=None,
-        device: Optional[Union[str, torch.device]] = "cpu",
+            self,
+            model_name=None,
+            use_auth_token=None,
+            device: Optional[Union[str, torch.device]] = "cpu",
     ):
         if isinstance(device, str):
             device = torch.device(device)
         model_config = model_name or "pyannote/speaker-diarization-3.1"
-        self.model = Pipeline.from_pretrained(model_config, use_auth_token=use_auth_token).to(device)
+        self.model = Pipeline.from_pretrained(
+            model_config,
+            use_auth_token=use_auth_token
+        ).to(device)
 
     def __call__(
         self,
@@ -33,8 +72,9 @@ class DiarizationPipeline:
             'waveform': torch.from_numpy(audio[None, :]),
             'sample_rate': SAMPLE_RATE
         }
+        hook = TQDMHook()
         segments, embeddings = self.model(audio_data, num_speakers=num_speakers, min_speakers=min_speakers,
-                                          max_speakers=max_speakers, return_embeddings=True)
+                                          max_speakers=max_speakers, return_embeddings=True, hook=hook)
         diarize_df = pd.DataFrame(segments.itertracks(yield_label=True), columns=['segment', 'label', 'speaker'])
         diarize_df['start'] = diarize_df['segment'].apply(lambda x: x.start)
         diarize_df['end'] = diarize_df['segment'].apply(lambda x: x.end)

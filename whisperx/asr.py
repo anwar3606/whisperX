@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from faster_whisper.tokenizer import Tokenizer
 from faster_whisper.transcribe import TranscriptionOptions, get_ctranslate2_storage
+from tqdm import tqdm
 from transformers import Pipeline
 from transformers.pipelines.pt_utils import PipelineIterator
 
@@ -255,11 +256,8 @@ class FasterWhisperPipeline(Pipeline):
         segments: List[SingleSegment] = []
         batch_size = batch_size or self._batch_size
         total_segments = len(vad_segments)
-        for idx, out in enumerate(self.__call__(data(audio, vad_segments), batch_size=batch_size, num_workers=num_workers)):
-            if print_progress:
-                base_progress = ((idx + 1) / total_segments) * 100
-                percent_complete = base_progress / 2 if combined_progress else base_progress
-                print(f"Progress: {percent_complete:.2f}%...")
+        for idx, out in tqdm(enumerate(self.__call__(data(audio, vad_segments), batch_size=batch_size, num_workers=num_workers)),
+                             total=total_segments, desc="VAD Detection", disable=not print_progress, leave=True):
             text = out['text']
             if batch_size in [0, 1, None]:
                 text = text[0]
