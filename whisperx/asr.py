@@ -257,7 +257,7 @@ class FasterWhisperPipeline(Pipeline):
         batch_size = batch_size or self._batch_size
         total_segments = len(vad_segments)
         for idx, out in tqdm(enumerate(self.__call__(data(audio, vad_segments), batch_size=batch_size, num_workers=num_workers)),
-                             total=total_segments, desc="VAD Detection", disable=not print_progress, leave=True):
+                             total=total_segments, desc="VAD Detection", disable=not print_progress):
             text = out['text']
             if batch_size in [0, 1, None]:
                 text = text[0]

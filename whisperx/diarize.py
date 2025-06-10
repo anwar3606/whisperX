@@ -10,7 +10,7 @@ from whisperx.types import TranscriptionResult, AlignedTranscriptionResult
 
 
 class TQDMHook:
-    def __init__(self, base_position=-1):
+    def __init__(self, base_position=0):
         self.progress_bars = {}
         self.position_counter = base_position
 
@@ -31,8 +31,7 @@ class TQDMHook:
             self.progress_bars[step_name] = tqdm(
                 desc=step_name,
                 total=total,
-                position=self.position_counter,
-                leave=True
+                position=self.position_counter
             )
 
         progress = self.progress_bars[step_name]

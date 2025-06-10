@@ -143,8 +143,7 @@ def align(
     total_segments = len(transcript)
     # Store temporary processing values
     segment_data: dict[int, SegmentData] = {}
-    for sdx, segment in tqdm(enumerate(transcript), total=total_segments, desc="Preprocessing Segments",
-                             disable=not print_progress):
+    for sdx, segment in enumerate(transcript):
         # strip spaces at beginning / end, but keep track of the amount.
         num_leading = len(segment["text"]) - len(segment["text"].lstrip())
         num_trailing = len(segment["text"]) - len(segment["text"].rstrip())
@@ -200,7 +199,8 @@ def align(
     aligned_segments: List[SingleAlignedSegment] = []
     
     # 2. Get prediction matrix from alignment model & align
-    for sdx, segment in enumerate(transcript):
+    for sdx, segment in tqdm(enumerate(transcript), total=total_segments, desc="Aligning Segments",
+                             disable=not print_progress):
         
         t1 = segment["start"]
         t2 = segment["end"]
