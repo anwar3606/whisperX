@@ -355,14 +355,24 @@ def load_model(
     if whisper_arch.endswith(".en"):
         language = "en"
 
-    model = model or WhisperModel(whisper_arch,
-                         device=device,
-                         device_index=device_index,
-                         compute_type=compute_type,
-                         download_root=download_root,
-                         local_files_only=local_files_only,
-                         cpu_threads=threads,
-                         use_auth_token=use_auth_token)
+    model_kwargs = {
+        "device": device,
+        "device_index": device_index,
+        "compute_type": compute_type,
+        "download_root": download_root,
+        "local_files_only": local_files_only,
+        "cpu_threads": threads
+    }
+    import inspect
+    sig = inspect.signature(faster_whisper.WhisperModel.__init__)
+    if "use_auth_token" in sig.parameters:
+        model_kwargs["use_auth_token"] = use_auth_token
+    elif "auth_token" in sig.parameters:
+        model_kwargs["auth_token"] = use_auth_token
+    elif "token" in sig.parameters:
+        model_kwargs["token"] = use_auth_token
+
+    model = model or WhisperModel(whisper_arch, **model_kwargs)
     if language is not None:
         tokenizer = Tokenizer(model.hf_tokenizer, model.model.is_multilingual, task=task, language=language)
     else:

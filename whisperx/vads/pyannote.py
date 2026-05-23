@@ -193,8 +193,15 @@ class VoiceActivitySegmentation(VoiceActivityDetection):
             token: Union[Text, None] = None,
             **inference_kwargs,
     ):
+        import inspect
+        sig = inspect.signature(VoiceActivityDetection.__init__)
+        kwargs = {}
+        if "use_auth_token" in sig.parameters:
+            kwargs["use_auth_token"] = token
+        elif "token" in sig.parameters:
+            kwargs["token"] = token
 
-        super().__init__(segmentation=segmentation, fscore=fscore, token=token, **inference_kwargs)
+        super().__init__(segmentation=segmentation, fscore=fscore, **kwargs, **inference_kwargs)
 
     def apply(self, file: AudioFile, hook: Optional[Callable] = None) -> Annotation:
         """Apply voice activity detection

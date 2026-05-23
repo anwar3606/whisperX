@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from pyannote.audio import Pipeline
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, Text, Any, Mapping
 import torch
 from tqdm import tqdm
 
@@ -134,8 +134,15 @@ class DiarizationPipeline:
         if isinstance(device, str):
             device = torch.device(device)
         model_config = model_name or "pyannote/speaker-diarization-community-1"
-        logger.info(f"Loading diarization model: {model_config}")
-        self.model = Pipeline.from_pretrained(model_config, token=token, cache_dir=cache_dir).to(device)
+        import inspect
+        sig = inspect.signature(Pipeline.from_pretrained)
+        kwargs = {}
+        if "use_auth_token" in sig.parameters:
+            kwargs["use_auth_token"] = token
+        elif "token" in sig.parameters:
+            kwargs["token"] = token
+
+        self.model = Pipeline.from_pretrained(model_config, cache_dir=cache_dir, **kwargs).to(device)
 
     def __call__(
         self,
@@ -193,21 +200,32 @@ class DiarizationPipeline:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            return_embeddings=return_embeddings,
             **({"hook": hook} if hook is not None else {}),
         )
 
         if progress_callback is not None:
             progress_callback(100.0)
 
-        diarization = output.speaker_diarization
-        embeddings = output.speaker_embeddings if return_embeddings else None
+        # Handle both pyannote.audio 3.x and 4.x output formats:
+        # - 3.x returns (Annotation, centroids_ndarray) tuple when return_embeddings=True
+        # - 4.x returns an object with .speaker_diarization / .speaker_embeddings attrs
+        if isinstance(output, tuple):
+            diarization, centroids = output
+        elif hasattr(output, "speaker_diarization"):
+            diarization = output.speaker_diarization
+            centroids = output.speaker_embeddings if return_embeddings else None
+        else:
+            # Bare Annotation (no embeddings requested or silent audio)
+            diarization = output
+            centroids = None
 
         diarize_df = pd.DataFrame(diarization.itertracks(yield_label=True), columns=['segment', 'label', 'speaker'])
         diarize_df['start'] = diarize_df['segment'].apply(lambda x: x.start)
         diarize_df['end'] = diarize_df['segment'].apply(lambda x: x.end)
 
-        if return_embeddings and embeddings is not None:
-            speaker_embeddings = {speaker: embeddings[s].tolist() for s, speaker in enumerate(diarization.labels())}
+        if return_embeddings and centroids is not None:
+            speaker_embeddings = {speaker: centroids[s].tolist() for s, speaker in enumerate(diarization.labels())}
             return diarize_df, speaker_embeddings
         
         # For backwards compatibility
